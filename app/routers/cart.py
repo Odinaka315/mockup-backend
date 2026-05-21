@@ -9,13 +9,31 @@ router = APIRouter(
     )
 
 # 1. GET ALL ITEMS IN USER'S CART
-@router.get("/", response_model=List[schemas.CartItemResponse])
+
+@router.get("/", response_model=schemas.CartSummaryResponse)
 def get_cart(
     db: Session = Depends(database.get_db), 
     current_user: models.User = Depends(oauth2.get_current_user)
 ):
+    
     cart_items = db.query(models.CartItem).filter(models.CartItem.user_id == current_user.id).all()
-    return cart_items
+    
+   
+    total_price = 0
+    total_quantity = 0
+    
+   
+    for item in cart_items:
+        
+        total_price += (item.product.price * item.quantity)
+        total_quantity += item.quantity
+        
+    
+    return {
+        "total_price": total_price,
+        "total_quantity": total_quantity,
+        "items": cart_items
+    }
 
 
 # 2. ADD ITEM TO CART (OR INCREMENT QUANTITY IF ALREADY EXISTS)

@@ -77,3 +77,101 @@ def checkout(
     db.refresh(new_order)
 
     return new_order
+
+from typing import List
+
+@router.get("/me", response_model=List[schemas.OrderHistoryResponse])
+def get_my_orders(
+    db: Session = Depends(database.get_db),
+    current_user: models.User = Depends(oauth2.get_current_user)
+):
+    # Fetch all orders belonging to the logged-in user
+    orders = db.query(models.Order).filter(models.Order.user_id == current_user.id).all()
+    
+    if not orders:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, 
+            detail="You have no previous orders."
+        )
+        
+    return orders
+
+# 2. ADMIN ONLY: GET ALL PLATFORM ORDERS
+# Notice the dependency is now `get_current_admin_user`!
+@router.get("/", response_model=List[schemas.OrderHistoryResponse])
+def get_all_orders(
+    db: Session = Depends(database.get_db),
+    current_admin: models.User = Depends(oauth2.get_current_admin_user) 
+):
+    orders = db.query(models.Order).all()
+    return orders
+
+
+# 3. GET SPECIFIC ORDER BY ID (Smart permissions)
+@router.get("/{id}", response_model=schemas.OrderHistoryResponse)
+def get_order_by_id(
+    id: int, 
+    db: Session = Depends(database.get_db),
+    current_user: models.User = Depends(oauth2.get_current_user)
+):
+    order = db.query(models.Order).filter(models.Order.id == id).first()
+    
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+
+    # SECURITY LOGIC: 
+    # If the user is NOT an admin AND they don't own this order, block them.
+    if not current_user.is_admin and order.user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, 
+            detail="Not authorized to view this order"
+        )
+        
+    return order
+
+@router.patch("/{id}/status", response_model=schemas.OrderResponse)
+def update_order_status(
+    id: int,
+    payload: schemas.OrderStatusUpdate,
+    db: Session = Depends(database.get_db),
+    # 1. Lock this down to admins only
+    current_admin: models.User = Depends(oauth2.get_current_admin_user)
+):
+    # 2. Fetch the order
+    order_query = db.query(models.Order).filter(models.Order.id == id)
+    order = order_query.first()
+
+    if not order:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, 
+            detail="Order not found"
+        )
+
+    # 3. Prevent "Un-cancelling"
+    # If it was cancelled, the stock was returned. Changing it back to pending 
+    # could sell stock that no longer exists. Force them to make a new order.
+    if order.status == "Cancelled" and payload.status != "Cancelled":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot change the status of a cancelled order. Please create a new order."
+        )
+
+    # 4. Inventory Restoration Logic
+    # Only restore stock if the order wasn't already cancelled
+    if payload.status == "Cancelled" and order.status != "Cancelled":
+        
+        # Loop through the items inside this specific order
+        for order_item in order.items:
+            # Find the original product
+            product = db.query(models.Product).filter(models.Product.id == order_item.product_id).first()
+            
+            # If the product hasn't been deleted from the database entirely, restore the stock
+            if product:
+                product.inventory_quantity += order_item.inventory_quantity
+
+    # 5. Finally, update the status and commit
+    order_query.update({"status": payload.status}, synchronize_session=False)
+    db.commit()
+    db.refresh(order)
+
+    return order

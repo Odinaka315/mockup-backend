@@ -13,6 +13,7 @@ class Product(Base):
     title = Column(String, nullable=False)
     price = Column(Integer, nullable=False)
     description = Column(String, nullable=False)
+    image_url = Column(String, nullable=True)
     created_at = Column(TIMESTAMP(timezone=True), nullable=False, server_default=text('now()'))
 
 class User(Base):
@@ -25,6 +26,8 @@ class User(Base):
     firstname = Column(String, nullable=False)
     middlename = Column(String, nullable=False)
     created_at = Column(TIMESTAMP(timezone=True), nullable=False, server_default=text('now()'))
+    profile_image_url = Column(String, nullable=True)
+    is_admin = Column(Boolean, nullable=False, server_default=text('false'))
 
 class Order(Base):
     __tablename__ = "orders"
@@ -35,6 +38,7 @@ class Order(Base):
     status = Column(String, nullable=False)
     created_at = Column(TIMESTAMP(timezone=True), nullable=False, server_default=text('now()'))
     user = relationship("User")
+    items = relationship("OrderItem", back_populates="order")
 
 class OrderItem(Base):
     __tablename__ = "order_items"
@@ -45,7 +49,7 @@ class OrderItem(Base):
     inventory_quantity = Column(Integer, nullable=False)
     price = Column(Integer, nullable=False)
     price_at_purchase = Column(Integer, nullable=False)
-    order = relationship("Order")
+    order = relationship("Order", back_populates="items")
     product = relationship("Product")
 
 class CartItem(Base):

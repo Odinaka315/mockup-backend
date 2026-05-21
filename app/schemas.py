@@ -1,6 +1,6 @@
 from pydantic import BaseModel, EmailStr, Field
 from datetime import datetime
-from typing import Optional, Literal
+from typing import Optional, Literal, List
 from pydantic.types import conint
 
 class ProductCreate(BaseModel):
@@ -9,6 +9,7 @@ class ProductCreate(BaseModel):
     description: str
     category: str
     inventory_quantity: int
+    image_url: Optional[str] = None # Added here
 
 class ProductResponse(ProductCreate):
     id: int
@@ -23,6 +24,7 @@ class UserCreate(BaseModel):
     surname: str
     firstname: str
     middlename: str
+    is_admin: bool
 
 
 class UserOut(BaseModel):
@@ -32,6 +34,7 @@ class UserOut(BaseModel):
     firstname: str
     middlename: str
     created_at: datetime
+    profile_image_url: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -79,6 +82,17 @@ class CartItemResponse(BaseModel):
     class Config:
         from_attributes = True
 
+
+# ... your existing CartItemResponse ...
+
+class CartSummaryResponse(BaseModel):
+    total_price: int
+    total_quantity: int
+    items: List[CartItemResponse]
+
+    class Config:
+        from_attributes = True
+
 class CartItemReduce(BaseModel):
     product_id: int
     reduce_by: int = Field(..., gt=0, description="The quantity you want to deduct from the cart")
@@ -91,3 +105,22 @@ class OrderResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+class OrderItemResponse(BaseModel):
+    product_id: int
+    inventory_quantity: int
+    price_at_purchase: int
+
+    class Config:
+        from_attributes = True
+
+# What the full order looks like, inheriting your original OrderResponse
+class OrderHistoryResponse(OrderResponse):
+    user: UserOut
+    items: List[OrderItemResponse] = []
+
+class OrderStatusUpdate(BaseModel):
+    # Literal enforces strict string matching
+    status: Literal["Pending", "Processing", "Shipped", "Delivered", "Cancelled"] = Field(
+        ..., description="The new status of the order"
+    )
