@@ -13,7 +13,8 @@ app = FastAPI(title="Mockup E-Commerce API")
 
 origins = [
     "http://localhost:5173",
-    "http://localhost:3000", # Good to have if you ever run on port 3000
+    "http://localhost:3000",
+    "https://storefront-olive-zeta.vercel.app" # Good to have if you ever run on port 3000
 ]
 app.add_middleware(
     CORSMiddleware,
