@@ -1,6 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from .. import models, schemas, database, oauth2
+from sqlalchemy.orm import joinedload
+
+from typing import List
 
 router = APIRouter(
     prefix="/api/v1/orders",
@@ -9,6 +12,7 @@ router = APIRouter(
 
 @router.post("/checkout", status_code=status.HTTP_201_CREATED, response_model=schemas.OrderResponse)
 def checkout(
+    payload: schemas.CheckoutRequest,
     db: Session = Depends(database.get_db),
     current_user: models.User = Depends(oauth2.get_current_user)
 ):
@@ -48,6 +52,7 @@ def checkout(
             inventory_quantity=item.quantity, 
             price=product.price,
             price_at_purchase=product.price
+            
         )
         order_items_to_create.append((new_order_item, product, item.quantity))
 
@@ -55,7 +60,12 @@ def checkout(
     new_order = models.Order(
         user_id=current_user.id,
         total_price=total_price,
-        status="Pending"
+        status="Processing",
+        street=payload.street,
+        city=payload.city,
+        lga=payload.lga,
+        state=payload.state,
+        country=payload.country
     )
     db.add(new_order)
     db.flush() # Flushes to DB to generate the new_order.id without committing
@@ -78,7 +88,6 @@ def checkout(
 
     return new_order
 
-from typing import List
 
 @router.get("/me", response_model=List[schemas.OrderHistoryResponse])
 def get_my_orders(
@@ -129,7 +138,26 @@ def get_order_by_id(
         
     return order
 
-@router.patch("/{id}/status", response_model=schemas.OrderResponse)
+@router.get("/{order_id}", response_model=schemas.OrderResponse)
+def get_order_details(
+    order_id: int, 
+    db: Session = Depends(database.get_db), 
+    current_user: models.User = Depends(oauth2.get_current_user)
+):
+    # FIXED: We chain .options(joinedload(...)) to tell SQLAlchemy to fetch the nested product data!
+    order = db.query(models.Order).options(
+        joinedload(models.Order.items).joinedload(models.OrderItem.product)
+    ).filter(
+        models.Order.id == order_id, 
+        models.Order.user_id == current_user.id
+    ).first()
+    
+    if not order:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
+        
+    return order
+
+@router.put("/{id}/status", response_model=schemas.OrderResponse)
 def update_order_status(
     id: int,
     payload: schemas.OrderStatusUpdate,
@@ -154,6 +182,11 @@ def update_order_status(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Cannot change the status of a cancelled order. Please create a new order."
+        )
+    if order.status == "Delivered" and payload.status != "Delivered":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot change the status of a delivered order. Please create a new order."
         )
 
     # 4. Inventory Restoration Logic

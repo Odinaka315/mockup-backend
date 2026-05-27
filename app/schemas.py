@@ -13,10 +13,20 @@ class ProductCreate(BaseModel):
 
 class ProductResponse(ProductCreate):
     id: int
-    created_at: datetime
+    title: str
+    price: float
+    image_url: str | None = None
 
     class Config:
-        orm_mode = True
+        from_attributes = True
+
+class ProductUpdate(BaseModel):
+    title: Optional[str] = None
+    description: Optional[str] = None
+    price: Optional[float] = Field(None, gt=0)
+    inventory_quantity: Optional[int] = Field(None, ge=0)
+    category: Optional[str] = None
+    image_url: Optional[str] = None
 
 class UserCreate(BaseModel):
     email: EmailStr
@@ -24,7 +34,7 @@ class UserCreate(BaseModel):
     surname: str
     firstname: str
     middlename: str
-    is_admin: bool
+    is_admin: bool = False
 
 
 class UserOut(BaseModel):
@@ -35,6 +45,8 @@ class UserOut(BaseModel):
     middlename: str
     created_at: datetime
     profile_image_url: Optional[str] = None
+    is_admin: bool = False
+
 
     class Config:
         from_attributes = True
@@ -56,7 +68,7 @@ class InventoryUpdate(BaseModel):
     inventory_change: int = Field(..., ne=0, description="Use positive numbers to add, negative to subtract.")
 
     class Config:
-        orm_mode = True # If using Pydantic v2 (or orm_mode = True for v1)
+        from_attributes = True 
 
 class CartItemCreate(BaseModel):
     product_id: int
@@ -68,6 +80,7 @@ class ProductInCart(BaseModel):
     title: str
     price: float
     inventory_quantity: int
+    image_url: str | None = None
 
     class Config:
         from_attributes = True
@@ -99,18 +112,25 @@ class CartItemReduce(BaseModel):
 
 class OrderResponse(BaseModel):
     id: int
-    total_price: int
+    user_id: int
+    total_price: float
     status: str
     created_at: datetime
-
+    items: List[OrderItemResponse] = []
+    street: str
+    city: str
+    lga: str
+    state: str
+    country: str
     class Config:
         from_attributes = True
 
 class OrderItemResponse(BaseModel):
+    id: int
     product_id: int
     inventory_quantity: int
-    price_at_purchase: int
-
+    price_at_purchase: float
+    product: ProductResponse
     class Config:
         from_attributes = True
 
@@ -124,3 +144,46 @@ class OrderStatusUpdate(BaseModel):
     status: Literal["Pending", "Processing", "Shipped", "Delivered", "Cancelled"] = Field(
         ..., description="The new status of the order"
     )
+
+class UserUpdate(BaseModel):
+    firstname: Optional[str] = None
+    lastname: Optional[str] = None
+    middlename: Optional[str] = None
+    email: Optional[EmailStr] = None
+    profile_image_url: Optional[str] = None
+
+class WishlistItemResponse(BaseModel):
+    id: int
+    user_id: int
+    product_id: int
+    created_at: datetime
+    
+    # Include the nested product so React can show the image/title/price!
+    product: ProductResponse 
+
+    class Config:
+        from_attributes = True
+
+class ReviewCreate(BaseModel):
+    rating: int = Field(ge=1, le=5, description="Rating must be between 1 and 5")
+    comment: Optional[str] = None
+
+class ReviewResponse(BaseModel):
+    id: int
+    product_id: int
+    rating: int
+    comment: Optional[str]
+    created_at: datetime
+    
+    # Include the user so React can show who left the review
+    user: UserOut 
+
+    class Config:
+        from_attributes = True
+
+class CheckoutRequest(BaseModel):
+    street: str
+    city: str
+    lga: str
+    state: str
+    country: str
