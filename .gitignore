@@ -1,3 +1,5 @@
 .env
 __pycache__
-backend/
+mockup-backend/
+Gemini.md
+alembic.ini

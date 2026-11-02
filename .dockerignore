@@ -1,0 +1,26 @@
+# Ignore Python virtual environment
+mockup-backend/
+.venv/
+
+# Ignore compiled Python files
+__pycache__/
+*.pyc
+*.pyo
+
+# Ignore editor and IDE specific files
+.vscode/
+
+# Ignore local environment variables
+.env
+
+# Ignore version control files
+.git/
+.gitignore
+
+# Ignore build-related and temporary files
+Dockerfile
+alembic.ini
+README
+
+# Gemini specific file
+Gemini.md

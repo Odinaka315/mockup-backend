@@ -12,10 +12,9 @@ from .config import settings
 app = FastAPI(title="Mockup E-Commerce API")
 
 origins = [
-    "http://localhost:5173",
-    "http://localhost:3000",
-    "https://storefront-olive-zeta.vercel.app" # Good to have if you ever run on port 3000
+    "*", # Good to have if you ever run on port 3000
 ]
+#https://storefront-olive-zeta.vercel.app
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
